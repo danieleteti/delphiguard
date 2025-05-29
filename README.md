@@ -13,7 +13,7 @@ DelphiGuard eliminates memory leaks in Delphi applications by providing automati
 
 **The Challenge with Manual Memory Management:**
 
-While `try-finally` blocks ensure proper cleanup, they require significant **boilerplate code** that can contain bugs and obscure your business logic. Interfaces simplify the job, but a lot of code, also in the RTL/VCL/FMX, is not interface based. DelphiGuard simplifies resource management for object by automating cleanup while keeping your code focused on what matters.
+While `try-finally` blocks ensure proper cleanup, they require significant **boilerplate code** that can contain bugs and obscure your business logic. DelphiGuard simplifies resource management by automating cleanup while keeping your code focused on what matters.
 
 **Traditional Approach - Lots of Memory Management Code:**
 
@@ -60,292 +60,209 @@ begin
 end;
 ```
 
-**DelphiGuard Approach - Focus on Business Logic:**
+---
+
+## 🎯 Two Solutions for Different Scenarios
+
+DelphiGuard provides two distinct patterns to handle different resource management scenarios:
+
+### 🛡️ **Guard Pattern** - For Single Objects
+
+**Use when:** You need to manage **1-3 individual objects** with **independent lifecycles**
 
 ```pascal
-// Same functionality with automatic cleanup
-procedure ProcessMultipleFiles;
+// Simple file reading with Guard
+function ReadConfigValue(const lKey: string): string;
 begin
-  var lInputFile := Using.Guard(TFileStream.Create('input.dat', fmOpenRead));
-  var lOutputFile := Using.Guard(TFileStream.Create('output.dat', fmCreate));
-  var lTempList := Using.Guard(TStringList.Create);
-  var lJsonParser := Using.Guard(TJSONObject.Create);
-  var lXmlDoc := Using.Guard(TXMLDocument.Create(nil));
-  
-  // Your business logic - clear and readable
-  LoadDataFromFile(lInputFile.Resource, lTempList.Resource);
-  ParseJsonData(lTempList.Resource.Text, lJsonParser.Resource);
-  ConvertToXml(lJsonParser.Resource, lXmlDoc.Resource);
-  SaveXmlToFile(lXmlDoc.Resource, lOutputFile.Resource);
-  
-  // Automatic cleanup - no nested try-finally blocks needed
+  var lConfig := Using.Guard(TIniFile.Create('app.ini'));
+  Result := lConfig.Resource.ReadString('Settings', lKey, '');
+  // Automatic cleanup when function exits
 end;
 ```
 
-**More Real-World Examples:**
+**Perfect for Guard Pattern:**
 
-**Example 1: Database Operations**
 ```pascal
-// Traditional approach
-procedure ExportUserData;
-var
-  lConnection: TFDConnection;
-  lQuery: TFDQuery;
-  lExportFile: TStringList;
-  lCSVFile: TFileStream;
+// Single HTTP request
+function FetchUserData(const lUserID: string): string;
 begin
-  lConnection := TFDConnection.Create(nil);
-  try
-    lQuery := TFDQuery.Create(nil);
-    try
-      lExportFile := TStringList.Create;
-      try
-        lCSVFile := TFileStream.Create('users.csv', fmCreate);
-        try
-          // Business logic
-          SetupConnection(lConnection);
-          ConfigureQuery(lQuery, lConnection);
-          lQuery.Open;
-          while not lQuery.Eof do
-          begin
-            lExportFile.Add(FormatUserRecord(lQuery));
-            lQuery.Next;
-          end;
-          SaveToCSV(lExportFile, lCSVFile);
-        finally
-          lCSVFile.Free;
-        end;
-      finally
-        lExportFile.Free;
-      end;
-    finally
-      lQuery.Free;
-    end;
-  finally
-    lConnection.Free;
-  end;
+  var lHTTP := Using.Guard(TIdHTTP.Create(nil));
+  var lResponse := Using.Guard(TStringStream.Create);
+  
+  lHTTP.Resource.Get('https://api.example.com/users/' + lUserID, lResponse.Resource);
+  Result := lResponse.Resource.DataString;
+  // Both objects automatically freed
 end;
 
-// DelphiGuard approach
-procedure ExportUserData;
+// Simple database query
+function GetUserCount: Integer;
+begin
+  var lQuery := Using.Guard(TFDQuery.Create(nil));
+  
+  lQuery.Resource.Connection := GetSharedConnection; // Using existing connection
+  lQuery.Resource.SQL.Text := 'SELECT COUNT(*) FROM Users';
+  lQuery.Resource.Open;
+  Result := lQuery.Resource.Fields[0].AsInteger;
+  // Query automatically freed, connection remains open
+end;
+
+// File processing with error handling
+procedure ProcessSingleFile(const lFileName: string);
+begin
+  var lFile := Using.Guard(TFileStream.Create(lFileName, fmOpenRead));
+  var lLines := Using.Guard(TStringList.Create);
+  
+  lLines.Resource.LoadFromStream(lFile.Resource);
+  ProcessLines(lLines.Resource);
+  // Exception-safe cleanup guaranteed
+end;
+```
+
+**When to stick with try-finally instead of Guard:**
+- Objects that need to be accessed after the method scope ends
+- When you need precise control over destruction order
+- Objects with complex initialization that might fail partway through
+
+### 📦 **ResourceManager Pattern** - For Object Groups
+
+**Use when:** You need to manage **4+ objects** or objects with **related lifecycles**
+
+```pascal
+// Multiple related resources with ResourceManager
+procedure GenerateComplexReport;
 begin
   var lResources := NewResourceScope();
   
   var lConnection := lResources.Manager.Add(TFDConnection.Create(nil));
-  var lQuery := lResources.Manager.Add(TFDQuery.Create(nil));
-  var lExportFile := lResources.Manager.Add(TStringList.Create);
-  var lCSVFile := lResources.Manager.Add(TFileStream.Create('users.csv', fmCreate));
+  var lQuery1 := lResources.Manager.Add(TFDQuery.Create(nil));
+  var lQuery2 := lResources.Manager.Add(TFDQuery.Create(nil));
+  var lReportData := lResources.Manager.Add(TStringList.Create);
+  var lOutputFile := lResources.Manager.Add(TFileStream.Create('report.txt', fmCreate));
   
-  // Business logic is clear and prominent
-  SetupConnection(lConnection);
-  ConfigureQuery(lQuery, lConnection);
-  lQuery.Open;
-  while not lQuery.Eof do
-  begin
-    lExportFile.Add(FormatUserRecord(lQuery));
-    lQuery.Next;
-  end;
-  SaveToCSV(lExportFile, lCSVFile);
-  
-  // All resources automatically cleaned up
+  // All resources managed together
+  SetupDatabase(lConnection, lQuery1, lQuery2);
+  GenerateReport(lQuery1, lQuery2, lReportData, lOutputFile);
+  // All resources freed together automatically
 end;
 ```
 
-**Example 2: HTTP Request with JSON Processing**
+**Perfect for ResourceManager Pattern:**
+
 ```pascal
-// Traditional approach
-function CallWebAPI(const URL: string): string;
-var
-  lHTTP: TIdHTTP;
-  lResponse: TStringStream;
-  lJSON: TJSONObject;
-  lSSL: TIdSSLIOHandlerSocketOpenSSL;
+// Database transaction with multiple objects
+procedure TransferFunds(lFromAccount, lToAccount: Integer; lAmount: Currency);
 begin
-  lHTTP := TIdHTTP.Create(nil);
-  try
-    lSSL := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
-    try
-      lResponse := TStringStream.Create;
-      try
-        lJSON := TJSONObject.Create;
-        try
-          // Business logic
-          lHTTP.IOHandler := lSSL;
-          lHTTP.Get(URL, lResponse);
-          lJSON := TJSONObject.ParseJSONValue(lResponse.DataString) as TJSONObject;
-          Result := ProcessAPIResponse(lJSON);
-        finally
-          lJSON.Free;
-        end;
-      finally
-        lResponse.Free;
-      end;
-    finally
-      lSSL.Free;
-    end;
-  finally
-    lHTTP.Free;
-  end;
-end;
-
-// DelphiGuard approach
-function CallWebAPI(const URL: string): string;
-begin
-  var lHTTP := Using.Guard(TIdHTTP.Create(nil));
-  var lSSL := Using.Guard(TIdSSLIOHandlerSocketOpenSSL.Create(nil));
-  var lResponse := Using.Guard(TStringStream.Create);
-  var lJSON := Using.Guard(TJSONObject.Create);
+  var lResources := NewDebugResourceScope(); // With logging
   
-  // Business logic stands out clearly
-  lHTTP.Resource.IOHandler := lSSL.Resource;
-  lHTTP.Resource.Get(URL, lResponse.Resource);
-  lJSON.Resource := TJSONObject.ParseJSONValue(lResponse.Resource.DataString) as TJSONObject;
-  Result := ProcessAPIResponse(lJSON.Resource);
+  var lConnection := lResources.Manager.Add(TFDConnection.Create(nil));
+  var lTransaction := lResources.Manager.Add(TFDTransaction.Create(nil));
+  var lQueryDebit := lResources.Manager.Add(TFDQuery.Create(nil));
+  var lQueryCredit := lResources.Manager.Add(TFDQuery.Create(nil));
+  var lQueryValidate := lResources.Manager.Add(TFDQuery.Create(nil));
   
-  // Automatic cleanup
-end;
-```
-
-**Example 3: Email with Attachments**
-```pascal
-// Traditional approach
-procedure SendReportEmail(const Recipients: string; const ReportFiles: TArray<string>);
-var
-  lSMTP: TIdSMTP;
-  lMessage: TIdMessage;
-  lSSL: TIdSSLIOHandlerSocketOpenSSL;
-  i: Integer;
-  lAttachment: TIdAttachmentFile;
-begin
-  lSMTP := TIdSMTP.Create(nil);
+  // Setup all database objects
+  SetupDatabaseObjects(lConnection, lTransaction, lQueryDebit, lQueryCredit, lQueryValidate);
+  
   try
-    lSSL := TIdSSLIOHandlerSocketOpenSSL.Create(nil);
-    try
-      lMessage := TIdMessage.Create(nil);
-      try
-        // Setup email
-        ConfigureSMTP(lSMTP, lSSL);
-        lMessage.Recipients.EMailAddresses := Recipients;
-        lMessage.Subject := 'Weekly Report';
-        
-        // Add attachments - more cleanup code needed
-        for i := 0 to High(ReportFiles) do
-        begin
-          lAttachment := TIdAttachmentFile.Create(lMessage.MessageParts, ReportFiles[i]);
-          // Note: Attachment will be freed when Message is freed
-        end;
-        
-        lSMTP.Send(lMessage);
-      finally
-        lMessage.Free; // This frees attachments too
-      end;
-    finally
-      lSSL.Free;
-    end;
-  finally
-    lSMTP.Free;
+    lTransaction.StartTransaction;
+    ValidateAccount(lQueryValidate, lFromAccount, lAmount);
+    DebitAccount(lQueryDebit, lFromAccount, lAmount);
+    CreditAccount(lQueryCredit, lToAccount, lAmount);
+    lTransaction.Commit;
+  except
+    lTransaction.Rollback;
+    raise;
   end;
+  
+  // All database objects cleaned up together with debug logging
 end;
 
-// DelphiGuard approach
-procedure SendReportEmail(const Recipients: string; const ReportFiles: TArray<string>);
+// Email with multiple attachments
+procedure SendEmailWithAttachments(const lRecipients: string; const lAttachmentFiles: TArray<string>);
 begin
   var lResources := NewResourceScope();
   
   var lSMTP := lResources.Manager.Add(TIdSMTP.Create(nil));
-  var lSSL := lResources.Manager.Add(TIdSSLIOHandlerSocketOpenSSL.Create(nil));
   var lMessage := lResources.Manager.Add(TIdMessage.Create(nil));
+  var lSSL := lResources.Manager.Add(TIdSSLIOHandlerSocketOpenSSL.Create(nil));
   
-  // Business logic is prominent
-  ConfigureSMTP(lSMTP, lSSL);
-  lMessage.Recipients.EMailAddresses := Recipients;
-  lMessage.Subject := 'Weekly Report';
+  // Configure email components
+  ConfigureEmailSettings(lSMTP, lSSL, lMessage);
+  lMessage.Recipients.EMailAddresses := lRecipients;
   
-  // Add attachments
-  for var lReportFile in ReportFiles do
-    lResources.Manager.Add(TIdAttachmentFile.Create(lMessage.MessageParts, lReportFile));
+  // Add all attachments to the same resource scope
+  for var lAttachmentFile in lAttachmentFiles do
+    lResources.Manager.Add(TIdAttachmentFile.Create(lMessage.MessageParts, lAttachmentFile));
   
   lSMTP.Send(lMessage);
-  
-  // Everything cleaned up automatically
-end;
-```
-
-**Example 4: Complex Data Processing Pipeline**
-```pascal
-// Traditional approach requires many nested try-finally blocks
-procedure ProcessDataPipeline(const InputFiles: TArray<string>);
-var
-  lInputList, lOutputList, lErrorList: TStringList;
-  lProcessor: TDataProcessor;
-  lLogger: TFileStream;
-  i: Integer;
-  lTempFile: TFileStream;
-begin
-  lInputList := TStringList.Create;
-  try
-    lOutputList := TStringList.Create;
-    try
-      lErrorList := TStringList.Create;
-      try
-        lProcessor := TDataProcessor.Create;
-        try
-          lLogger := TFileStream.Create('processing.log', fmCreate);
-          try
-            // Business logic gets buried in structure
-            for i := 0 to High(InputFiles) do
-            begin
-              lTempFile := TFileStream.Create(InputFiles[i], fmOpenRead);
-              try
-                ProcessSingleFile(lTempFile, lProcessor, lInputList, lOutputList, lErrorList, lLogger);
-              finally
-                lTempFile.Free;
-              end;
-            end;
-            
-            SaveResults(lOutputList, lErrorList);
-          finally
-            lLogger.Free;
-          end;
-        finally
-          lProcessor.Free;
-        end;
-      finally
-        lErrorList.Free;
-      end;
-    finally
-      lOutputList.Free;
-    end;
-  finally
-    lInputList.Free;
-  end;
+  // All email objects and attachments cleaned up together
 end;
 
-// DelphiGuard approach - business logic is clear
-procedure ProcessDataPipeline(const InputFiles: TArray<string>);
+// Complex data processing pipeline
+procedure ProcessDataFiles(const lInputDir, lOutputDir: string);
 begin
-  var lResources := NewResourceScope();
+  var lResources := NewResourceScopeWithDebug(
+    procedure(const lMsg: string)
+    begin
+      WriteLn('RESOURCE: ' + lMsg);
+    end
+  );
   
-  var lInputList := lResources.Manager.Add(TStringList.Create);
-  var lOutputList := lResources.Manager.Add(TStringList.Create);
-  var lErrorList := lResources.Manager.Add(TStringList.Create);
+  var lFileList := lResources.Manager.Add(TStringList.Create);
   var lProcessor := lResources.Manager.Add(TDataProcessor.Create);
-  var lLogger := lResources.Manager.Add(TFileStream.Create('processing.log', fmCreate));
+  var lResults := lResources.Manager.Add(TStringList.Create);
+  var lErrors := lResources.Manager.Add(TStringList.Create);
+  var lLogFile := lResources.Manager.Add(TFileStream.Create('processing.log', fmCreate));
   
-  // Business logic is the focus
-  for var lInputFile in InputFiles do
+  // Find all files to process
+  DiscoverFiles(lInputDir, lFileList);
+  
+  // Process each file (adding temporary resources to the same scope)
+  for var lInputFile in lFileList do
   begin
-    var lTempFile := lResources.Manager.Add(TFileStream.Create(lInputFile, fmOpenRead));
-    ProcessSingleFile(lTempFile, lProcessor, lInputList, lOutputList, lErrorList, lLogger);
+    var lTempStream := lResources.Manager.Add(TFileStream.Create(lInputFile, fmOpenRead));
+    var lOutputPath := ChangeFileExt(lInputFile.Replace(lInputDir, lOutputDir), '.processed');
+    var lOutputStream := lResources.Manager.Add(TFileStream.Create(lOutputPath, fmCreate));
+    
+    ProcessSingleFile(lTempStream, lOutputStream, lProcessor, lResults, lErrors, lLogFile);
   end;
   
-  SaveResults(lOutputList, lErrorList);
-  
-  // All resources automatically managed
+  SaveProcessingResults(lResults, lErrors, lOutputDir);
+  // All resources (including temporary ones) cleaned up with debug output
 end;
 ```
 
-**Key Benefits:**
+**When to stick with try-finally instead of ResourceManager:**
+- When objects need different destruction timing
+- Objects that are passed to other methods that take ownership
+- When you need to free some resources mid-method while keeping others
+
+---
+
+## 🤔 Decision Guide: Which Pattern to Use?
+
+### ✅ Use **Guard Pattern** when:
+- Managing **1-3 objects** maximum
+- Objects have **independent lifecycles**
+- **Simple, focused methods** 
+- Objects are used only within current method scope
+- You want **minimal syntax overhead**
+
+### ✅ Use **ResourceManager Pattern** when:
+- Managing **4+ objects** together
+- Objects have **dependencies** or **related lifecycles**
+- You need **centralized cleanup** and **debug logging**
+- **Complex scenarios** with multiple failure points
+- Objects are created and used as a **logical group**
+
+### ✅ Stick with **traditional try-finally** when:
+- Objects need to **survive beyond method scope**
+- You need **precise control** over destruction order
+- **Performance is absolutely critical** (zero overhead needed)
+- Objects have **complex initialization** with conditional creation
+- Working with **legacy code** that expects manual management
+
+**Key Benefits of DelphiGuard:**
 - 📝 **Less boilerplate**: Eliminate nested try-finally structures
 - 🎯 **Focus on business logic**: Memory management doesn't obscure your intent
 - 🛡️ **Exception-safe**: Automatic cleanup even when exceptions occur
