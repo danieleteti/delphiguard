@@ -1,9 +1,9 @@
 # 🛡️ DelphiGuard (DGuard)
 
-[![Delphi Versions](https://img.shields.io/badge/Delphi-10.2%2B-blue.svg)](https://www.embarcadero.com/products/delphi)
+[![Delphi Versions](https://img.shields.io/badge/Delphi-XE%2B-blue.svg)](https://www.embarcadero.com/products/delphi)
 [![Platforms](https://img.shields.io/badge/Platforms-Win32%20%7C%20Win64%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-lightgrey.svg)](https://github.com/yourusername/DelphiGuard)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/yourusername/DelphiGuard.svg)](https://github.com/yourusername/DelphiGuard/stargazers)
+[![License](https://img.shields.io/badge/License-Apache-green.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/danieleteti/DelphiGuard.svg)](https://github.com/danieleteti/DelphiGuard/stargazers)
 
 **Automatic memory management for Delphi using RAII (Resource Acquisition Is Initialization) pattern**
 
@@ -68,7 +68,7 @@ DelphiGuard provides two distinct patterns to handle different resource manageme
 
 ### 🛡️ **Guard Pattern** - For Single Objects
 
-**Use when:** You need to manage **1-3 individual objects** with **independent lifecycles**
+**Use when:** You need to manage **individual objects** with **independent lifecycles**
 
 ```pascal
 // Simple file reading with Guard
@@ -119,13 +119,13 @@ end;
 ```
 
 **When to stick with try-finally instead of Guard:**
-- Objects that need to be accessed after the method scope ends
+- Objects that need to be accessed after the method scope ends as plain object reference
 - When you need precise control over destruction order
 - Objects with complex initialization that might fail partway through
 
 ### 📦 **ResourceManager Pattern** - For Object Groups
 
-**Use when:** You need to manage **4+ objects** or objects with **related lifecycles**
+**Use when:** You need to manage **2+ objects** with **related lifecycles**
 
 ```pascal
 // Multiple related resources with ResourceManager
@@ -256,11 +256,11 @@ end;
 - Objects are created and used as a **logical group**
 
 ### ✅ Stick with **traditional try-finally** when:
-- Objects need to **survive beyond method scope**
 - You need **precise control** over destruction order
 - **Performance is absolutely critical** (zero overhead needed)
 - Objects have **complex initialization** with conditional creation
 - Working with **legacy code** that expects manual management
+- Integration with **existing frameworks** that require specific cleanup patterns
 
 **Key Benefits of DelphiGuard:**
 - 📝 **Less boilerplate**: Eliminate nested try-finally structures
@@ -269,6 +269,7 @@ end;
 - 🔄 **Clear ownership**: No confusion about who owns what
 - 🐛 **Debug support**: Optional logging shows resource lifecycle
 - ⚡ **Maintainable**: Changes don't require restructuring cleanup code
+
 
 ## 📄 License
 
