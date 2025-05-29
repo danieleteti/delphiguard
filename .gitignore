@@ -79,3 +79,5 @@ __recovery/
 
 # Boss dependency manager vendor folder https://github.com/HashLoad/boss
 modules/
+/Sample/Win32/*
+/Sample/DGuardSample.res
