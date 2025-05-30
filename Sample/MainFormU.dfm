@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'DGuard :: Sample'
   ClientHeight = 196
-  ClientWidth = 584
+  ClientWidth = 641
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -37,5 +37,14 @@ object MainForm: TMainForm
     Caption = 'Extract from Guard'
     TabOrder = 2
     OnClick = btnExtractClick
+  end
+  object btnExtrastInFactory: TButton
+    Left = 406
+    Top = 8
+    Width = 193
+    Height = 65
+    Caption = 'Extract in Object Factory'
+    TabOrder = 3
+    OnClick = btnExtrastInFactoryClick
   end
 end
