@@ -45,6 +45,11 @@ uses
   {$IFDEF MSWINDOWS}, Winapi.Windows{$ENDIF};
 
 type
+  EGuard = class(Exception)
+
+  end;
+
+
   // ============================================================================
   // GUARD PATTERN - Individual Object Lifetime Management
   // ============================================================================
@@ -53,6 +58,7 @@ type
   IGuard<T: class> = interface
     function GetResource: T;
     property Resource: T read GetResource;
+    function ExtractFromGuard: T;
   end;
 
   // Factory for individual guards
@@ -62,11 +68,13 @@ type
       // Implementation Wrapper RAII
       TGuard<T: class> = class(TInterfacedObject, IGuard<T>)
       private
-        FResource: T;
+        fResource: T;
+        fExtracted: Boolean;
       public
         constructor Create(const AResource: T);
         destructor Destroy; override;
         function GetResource: T;
+        function ExtractFromGuard: T;
       end;
   public
     class function Guard<T: class>(AResource: T): IGuard<T>; static;
@@ -171,18 +179,37 @@ implementation
 constructor Using.TGuard<T>.Create(const AResource: T);
 begin
   inherited Create;
-  FResource := AResource;
+  fResource := AResource;
+  fExtracted := False;
 end;
 
 destructor Using.TGuard<T>.Destroy;
 begin
-  FResource.Free; // Automatic Cleanup
+  if not fExtracted then
+  begin
+    fResource.Free; // Automatic Cleanup
+  end;
   inherited;
+end;
+
+function Using.TGuard<T>.ExtractFromGuard: T;
+begin
+  if fExtracted then
+  begin
+    raise EGuard.Create('Resource already extracted');
+  end;
+  fExtracted := True;
+  Result := fResource;
+  fResource := nil;
 end;
 
 function Using.TGuard<T>.GetResource: T;
 begin
-  Result := FResource;
+  if fExtracted then
+  begin
+    raise EGuard.Create('Resource has been extracted, cannot be accessed from guard anymore');
+  end;
+  Result := fResource;
 end;
 
 class function Using.Guard<T>(AResource: T): IGuard<T>;

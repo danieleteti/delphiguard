@@ -10,8 +10,10 @@ type
   TMainForm = class(TForm)
     btnGuard: TButton;
     btnMultiple: TButton;
+    btnExtract: TButton;
     procedure btnGuardClick(Sender: TObject);
     procedure btnMultipleClick(Sender: TObject);
+    procedure btnExtractClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -27,21 +29,41 @@ implementation
 
 uses DGuard;
 
+procedure TMainForm.btnExtractClick(Sender: TObject);
+begin
+  var lSL1 := Using.Guard(TStringList.Create);
+  var lSL2 := Using.Guard(TStringList.Create);
+
+
+  //If you need plan instance you can "Extract" the resource.
+  //After being extracted the resource is no more managed by the guard and
+  //the memory management if up to you.
+  var lSLExtracted := lSL1.ExtractFromGuard;
+  try
+    //Use lSLExtracted as a normal reference
+  finally
+    lSLExtracted.Free;
+  end;
+
+  // Exiting from the scope lSL1 doesn't free its internal resource (because has been extracted)
+  // lSL2 is freed as usual
+end;
+
 procedure TMainForm.btnGuardClick(Sender: TObject);
 begin
   // Each object has independent lifetime
-  var stream1 := Using.Guard(TFileStream.Create('file1.txt', fmOpenWrite or fmCreate));
-  var stream2 := Using.Guard(TStringStream.Create('data'));
-  var list := Using.Guard(TStringList.Create);
+  var lStream1 := Using.Guard(TFileStream.Create('file1.txt', fmOpenWrite or fmCreate));
+  var lStream2 := Using.Guard(TStringStream.Create('data'));
+  var lList := Using.Guard(TStringList.Create);
 
   // Normal usage
-  list.Resource.Add('Item 1');
-  stream2.Resource.WriteString('test');
+  lList.Resource.Add('Item 1');
+  lStream2.Resource.WriteString('test');
 
   // Automatic cleanup when going out of scope
-  // stream1 is destroyed here
-  // stream2 is destroyed here
-  // list is destroyed here
+  // lStream1 is destroyed here
+  // lStream2 is destroyed here
+  // lList is destroyed here
 end;
 
 procedure TMainForm.btnMultipleClick(Sender: TObject);
