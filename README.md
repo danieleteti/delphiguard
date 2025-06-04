@@ -3,6 +3,7 @@
 [![Delphi Versions](https://img.shields.io/badge/Delphi-XE%2B-blue.svg)](https://www.embarcadero.com/products/delphi)
 [![Platforms](https://img.shields.io/badge/Platforms-Win32%20%7C%20Win64%20%7C%20Linux%20%7C%20macOS%20%7C%20Android-lightgrey.svg)](https://github.com/yourusername/DelphiGuard)
 [![License](https://img.shields.io/badge/License-Apache-green.svg)](LICENSE)
+[![Ask DeepWiki][DeepWikiBadge]](https://deepwiki.com/danieleteti/delphiguard)
 [![Stars](https://img.shields.io/github/stars/danieleteti/DelphiGuard.svg)](https://github.com/danieleteti/DelphiGuard/stargazers)
 
 **Automatic memory management for Delphi using RAII (Resource Acquisition Is Initialization) pattern**
@@ -286,3 +287,6 @@ This project is licensed under the Apache 2 License - see the [LICENSE](LICENSE)
 ⭐ **Found DelphiGuard useful?** Give it a star and help others discover it!
 
 **Questions?** Open an issue or start a discussion. We're here to help! 🚀
+
+
+[DeepwikiBadge]: https://deepwiki.com/badge.svg
